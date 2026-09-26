@@ -105,9 +105,13 @@ class RegionSelector(Gtk.Window):
 # ---------------------------------------------------------------- annotations
 
 def draw_arrow(cr, x1, y1, x2, y2, size):
-    cr.move_to(x1, y1); cr.line_to(x2, y2); cr.stroke()
     a = math.atan2(y2 - y1, x2 - x1)
-    L = 6 + size * 3
+    L = 8 + size * 3
+    # le trait s'arrête à l'intérieur de la pointe : son bout arrondi ne dépasse plus
+    back = min(L * 0.6, math.hypot(x2 - x1, y2 - y1))
+    cr.move_to(x1, y1)
+    cr.line_to(x2 - back * math.cos(a), y2 - back * math.sin(a))
+    cr.stroke()
     cr.move_to(x2, y2)
     cr.line_to(x2 - L * math.cos(a - 0.45), y2 - L * math.sin(a - 0.45))
     cr.line_to(x2 - L * math.cos(a + 0.45), y2 - L * math.sin(a + 0.45))
