@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name=Capture d'écran
+GenericName=Capture et annotation
+Comment=Outil léger de capture d'écran avec annotations
+Exec=@HOME@/.local/bin/capture-ecran %F
+Icon=org.gnome.Screenshot
+Terminal=false
+Categories=Graphics;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/webp;image/tiff;
+Keywords=screenshot;capture;écran;ksnip;
+Actions=zone;plein;fenetre;
+
+[Desktop Action zone]
+Name=Capturer une zone
+Exec=@HOME@/.local/bin/capture-ecran -r
+
+[Desktop Action plein]
+Name=Capturer tout l'écran
+Exec=@HOME@/.local/bin/capture-ecran -f
+
+[Desktop Action fenetre]
+Name=Capturer la fenêtre active
+Exec=@HOME@/.local/bin/capture-ecran -a
