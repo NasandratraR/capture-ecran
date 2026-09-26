@@ -15,11 +15,10 @@ Relancez `./install.sh` après chaque modification du code.
 ## Utilisation
 
 ```sh
-capture-ecran            # petite fenêtre : Zone / Plein écran / Fenêtre active
-capture-ecran -r         # zone rectangulaire
+capture-ecran            # sélection d'une zone, directement
 capture-ecran -f         # plein écran
 capture-ecran -a         # fenêtre active
-capture-ecran -d 3 -r    # délai de 3 s
+capture-ecran -d 3      # zone, après un délai de 3 s
 capture-ecran -f -o x.png   # enregistre directement, sans éditeur
 capture-ecran image.png  # ouvre une image dans l'éditeur
 ```

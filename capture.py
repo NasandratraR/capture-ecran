@@ -972,7 +972,7 @@ class Editor(Gtk.Window):
         self.app.open_paths(choose_images(self))
 
     def new_capture(self):
-        self.app.show_menu()
+        self.app.capture("r")
 
     def on_key(self, w, e):
         ctrl = e.state & Gdk.ModifierType.CONTROL_MASK
@@ -1047,7 +1047,7 @@ class App(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="io.github.capture_ecran",
                          flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
-        self.editor = self.menu = None
+        self.editor = None
         self.output = None
         self.delay = 0
 
@@ -1080,42 +1080,14 @@ class App(Gtk.Application):
             self.open_paths([f if f.startswith("/") else os.path.join(cwd, f) for f in
                              (GLib.filename_from_uri(u)[0] if u.startswith("file://") else u
                               for u in args.files)])
-        elif args.mode:
-            self.capture(args.mode, args.delay)
-        elif self.editor:
-            self.editor.present()
         else:
-            self.show_menu()
+            # lancement normal : on passe directement à la sélection de zone
+            self.capture(args.mode or "r", args.delay)
         return 0
 
-    def show_menu(self):
-        if self.menu is None:
-            m = Gtk.Window(title="Capture", resizable=False, application=self)
-            m.set_titlebar(Gtk.HeaderBar(show_close_button=True, title="Capture"))
-            m.connect("destroy", lambda *_: setattr(self, "menu", None))
-            g = Gtk.Grid(column_spacing=6, row_spacing=6, margin=10)
-            for i, (label, mode) in enumerate([("Zone", "r"), ("Plein écran", "f"), ("Fenêtre active", "a")]):
-                b = Gtk.Button(label=label)
-                b.connect("clicked", lambda *_, md=mode: self.capture(md))
-                g.attach(b, i, 0, 1, 1)
-            g.attach(Gtk.Label(label="Délai (s)"), 0, 1, 1, 1)
-            self.delay_spin = Gtk.SpinButton.new_with_range(0, 60, 1)
-            self.delay_spin.set_value(self.delay)
-            g.attach(self.delay_spin, 1, 1, 2, 1)
-            ob = Gtk.Button(label="Ouvrir une image…")
-            ob.connect("clicked", lambda *_: self.open_paths(choose_images(self.menu)))
-            g.attach(ob, 0, 2, 3, 1)
-            m.add(g)
-            self.menu = m
-        self.menu.show_all(); self.menu.present()
-
-    def capture(self, mode, delay=None):
-        if delay is None:
-            delay = int(self.delay_spin.get_value()) if self.menu else 0
-        self.hold()   # l'application reste active pendant que les fenêtres sont cachées
-        # nos fenêtres ne doivent pas cacher l'écran
-        if self.menu:
-            self.menu.hide()
+    def capture(self, mode="r", delay=0):
+        self.hold()   # l'application reste active pendant que la fenêtre est cachée
+        # notre fenêtre ne doit pas cacher l'écran
         if self.editor:
             self.editor.hide()
         # petit délai minimum pour que les fenêtres disparaissent de l'écran
@@ -1129,8 +1101,6 @@ class App(Gtk.Application):
         return False
 
     def ensure_editor(self):
-        if self.menu:
-            self.menu.destroy()
         if self.editor is None:
             self.editor = Editor(self)
             self.editor.connect("destroy", lambda *_: setattr(self, "editor", None))
@@ -1147,7 +1117,7 @@ class App(Gtk.Application):
         if self.editor:
             self.editor.show(); self.editor.present()
         if bad:
-            d = Gtk.MessageDialog(transient_for=self.editor or self.menu, modal=True,
+            d = Gtk.MessageDialog(transient_for=self.editor, modal=True,
                                   message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.OK,
                                   text="Impossible d'ouvrir : " + ", ".join(bad))
             d.run(); d.destroy()
@@ -1157,8 +1127,6 @@ class App(Gtk.Application):
             # capture annulée : on réaffiche ce qui était ouvert
             if self.editor:
                 self.editor.present()
-            elif self.menu:
-                self.menu.show_all()
         elif self.output:
             save_pixbuf(pix, self.output)
             print(self.output)
