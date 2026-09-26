@@ -749,9 +749,9 @@ class Editor(Gtk.Window):
         self.hb = Gtk.HeaderBar(show_close_button=True, title="Capture")
         self.set_titlebar(self.hb)
         for icon, tip, cb in [("camera-photo-symbolic", "Nouvelle capture (Ctrl+N)", self.new_capture),
+                              ("edit-copy-symbolic", "Copier (Ctrl+C)", self.copy),
                               ("document-open-symbolic", "Ouvrir une image (Ctrl+O)", self.open_files),
                               ("document-save-symbolic", "Enregistrer (Ctrl+S)", self.save),
-                              ("edit-copy-symbolic", "Copier (Ctrl+C)", self.copy),
                               ("edit-undo-symbolic", "Annuler (Ctrl+Z)", self.undo),
                               ("edit-redo-symbolic", "Rétablir (Ctrl+Y)", self.do_redo),
                               ("view-pin-symbolic", "Épingler au-dessus", self.pin),
@@ -763,6 +763,8 @@ class Editor(Gtk.Window):
             b.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.BUTTON))
             b.set_always_show_image(True)
             b.set_tooltip_text(tip); b.connect("clicked", lambda *_, f=cb: f())
+            if icon == "edit-copy-symbolic":
+                b.get_style_context().add_class("copy-button")   # bouton le plus utilisé : mis en valeur
             if icon.startswith(("view-pin", "object-rotate")):
                 self.hb.pack_end(b)
             else:
@@ -1064,6 +1066,11 @@ class App(Gtk.Application):
         css.load_from_data(b"""
             decoration { border: 1px solid #8a8a8a; border-radius: 8px 8px 0 0; }
             window:backdrop decoration { border-color: #b0b0b0; }
+            button.copy-button { background: #1c71d8; color: #ffffff; border-color: #1a5fb4;
+                                 box-shadow: none; text-shadow: none; }
+            button.copy-button:hover { background: #3584e4; }
+            button.copy-button:active { background: #1a5fb4; }
+            button.copy-button image { color: #ffffff; }
         """)
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
