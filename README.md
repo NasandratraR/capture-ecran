@@ -44,5 +44,7 @@ Une seule instance : relancer l'application ajoute un onglet à la fenêtre déj
 | Ctrl+Z / Ctrl+Y | Annuler / Rétablir |
 | Ctrl+R / Ctrl+Maj+R | Pivoter à droite / à gauche |
 | Ctrl+W | Fermer l'onglet |
+| Ctrl+- / Ctrl++ | Dézoomer / Zoomer (aussi Ctrl + molette) |
+| Ctrl+0 / Ctrl+9 | Zoom 100 % / Ajuster à la fenêtre |
 | Suppr | Supprimer l'élément sélectionné |
 | Échap | Désélectionner |

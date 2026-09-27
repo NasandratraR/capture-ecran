@@ -375,6 +375,7 @@ def sel_handles(s):
 
 
 MARGIN = 16
+ZOOMS = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3, 4]
 
 
 def shape_bounds(s):
@@ -404,9 +405,12 @@ class Canvas(Gtk.ScrolledWindow):
 
         # la zone de dessin occupe tout l'onglet : on peut annoter hors de la capture
         self.da = Gtk.DrawingArea()
-        self.da.set_size_request(pix.get_width() + 2 * MARGIN, pix.get_height() + 2 * MARGIN)
+        self.zoom = 1.0
+        self.resize_area()
         self.da.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK
-                           | Gdk.EventMask.POINTER_MOTION_MASK)
+                           | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.SCROLL_MASK
+                           | Gdk.EventMask.SMOOTH_SCROLL_MASK)
+        self.da.connect("scroll-event", self.on_scroll)
         self.da.connect("draw", self.on_draw)
         self.da.connect("button-press-event", self.on_press)
         self.da.connect("motion-notify-event", self.on_motion)
@@ -443,24 +447,68 @@ class Canvas(Gtk.ScrolledWindow):
 
     def on_draw(self, w, cr):
         iw, ih = self.base.get_width(), self.base.get_height()
+        z = self.zoom
         # capture centrée, avec au moins MARGIN autour
-        self.ox = max(MARGIN, (w.get_allocated_width() - iw) // 2)
-        self.oy = max(MARGIN, (w.get_allocated_height() - ih) // 2)
+        self.ox = max(MARGIN, (w.get_allocated_width() - iw * z) // 2)
+        self.oy = max(MARGIN, (w.get_allocated_height() - ih * z) // 2)
         cr.translate(self.ox, self.oy)
+        cr.scale(z, z)
         # fine ombre autour de la capture
         cr.set_source_rgba(0, 0, 0, 0.25)
         cr.rectangle(-1, -1, iw + 2, ih + 2); cr.fill()
         self.render(cr, self.shapes + ([self.cur] if self.cur else []))
         if self.sel in self.shapes and not self.cur:
             x0, y0, x1, y1 = sel_box(self.sel)
-            cr.set_source_rgb(0.2, 0.5, 0.9); cr.set_line_width(1)
-            cr.set_dash([4, 3])
-            cr.rectangle(x0 - 4, y0 - 4, x1 - x0 + 8, y1 - y0 + 8); cr.stroke()
+            u = 1 / z   # cadre et poignées gardent la même taille à l'écran
+            cr.set_source_rgb(0.2, 0.5, 0.9); cr.set_line_width(u)
+            cr.set_dash([4 * u, 3 * u])
+            cr.rectangle(x0 - 4 * u, y0 - 4 * u, x1 - x0 + 8 * u, y1 - y0 + 8 * u); cr.stroke()
             cr.set_dash([])
             for hx, hy, _ in sel_handles(self.sel):
-                cr.rectangle(hx - 4, hy - 4, 8, 8)
+                cr.rectangle(hx - 4 * u, hy - 4 * u, 8 * u, 8 * u)
                 cr.set_source_rgb(1, 1, 1); cr.fill_preserve()
-                cr.set_source_rgb(0.2, 0.5, 0.9); cr.set_line_width(1.5); cr.stroke()
+                cr.set_source_rgb(0.2, 0.5, 0.9); cr.set_line_width(1.5 * u); cr.stroke()
+
+    def resize_area(self):
+        z = self.zoom
+        self.da.set_size_request(int(self.base.get_width() * z) + 2 * MARGIN,
+                                 int(self.base.get_height() * z) + 2 * MARGIN)
+        self.da.queue_draw()
+
+    def set_zoom(self, z):
+        self.zoom = max(ZOOMS[0], min(ZOOMS[-1], z))
+        self.resize_area()
+        self.ed.update_zoom(self)
+
+    def zoom_step(self, direction):
+        z = self.zoom
+        if direction > 0:
+            nxt = [v for v in ZOOMS if v > z + 1e-6]
+            self.set_zoom(nxt[0] if nxt else ZOOMS[-1])
+        else:
+            prv = [v for v in ZOOMS if v < z - 1e-6]
+            self.set_zoom(prv[-1] if prv else ZOOMS[0])
+
+    def zoom_fit(self):
+        """Toute l'image visible dans la fenêtre (sans jamais agrandir au-delà de 100 %)."""
+        a = self.get_allocation()
+        fx = (a.width - 2 * MARGIN) / self.base.get_width()
+        fy = (a.height - 2 * MARGIN) / self.base.get_height()
+        self.set_zoom(max(0.05, min(1, fx, fy)))
+
+    def on_scroll(self, w, e):
+        # Ctrl + molette : zoom
+        if not e.state & Gdk.ModifierType.CONTROL_MASK:
+            return False
+        if e.direction == Gdk.ScrollDirection.UP:
+            self.zoom_step(1)
+        elif e.direction == Gdk.ScrollDirection.DOWN:
+            self.zoom_step(-1)
+        elif e.direction == Gdk.ScrollDirection.SMOOTH:
+            ok, dx, dy = e.get_scroll_deltas()
+            if dy:
+                self.zoom_step(-1 if dy > 0 else 1)
+        return True
 
     def final_pixbuf(self):
         # passe à blanc pour connaître la taille des textes
@@ -510,7 +558,7 @@ class Canvas(Gtk.ScrolledWindow):
         precise : seul le trait compte (outils de dessin, pour pouvoir dessiner à l'intérieur)."""
         if self.sel in self.shapes:
             for hx, hy, hid in sel_handles(self.sel):
-                if abs(x - hx) <= 6 and abs(y - hy) <= 6:
+                if abs(x - hx) <= 6 / self.zoom and abs(y - hy) <= 6 / self.zoom:
                     return self.sel, hid
         if precise:
             for s in reversed(self.shapes):
@@ -551,7 +599,7 @@ class Canvas(Gtk.ScrolledWindow):
     def on_press(self, w, e):
         if e.button != 1:
             return
-        ex, ey = e.x - self.ox, e.y - self.oy
+        ex, ey = (e.x - self.ox) / self.zoom, (e.y - self.oy) / self.zoom
         t = self.text_at(ex, ey)
         if not t and e.type == Gdk.EventType._2BUTTON_PRESS:
             t = next((s for s in reversed(self.shapes)
@@ -596,7 +644,7 @@ class Canvas(Gtk.ScrolledWindow):
         self.cur = self.new_shape(ex, ey)
 
     def on_motion(self, w, e):
-        ex, ey = e.x - self.ox, e.y - self.oy
+        ex, ey = (e.x - self.ox) / self.zoom, (e.y - self.oy) / self.zoom
         if self.drag:
             d = self.drag
             if not d["moved"]:
@@ -680,7 +728,7 @@ class Canvas(Gtk.ScrolledWindow):
     def restore(self, state):
         self.base, self.shapes = state
         self.sel = None; self.drag = None
-        self.da.set_size_request(self.base.get_width() + 2 * MARGIN, self.base.get_height() + 2 * MARGIN)
+        self.resize_area()
         self.ed.update_title(self)
         self.changed()
 
@@ -806,7 +854,23 @@ class Editor(Gtk.Window):
 
         # onglets : historique des captures de la session
         self.nb = Gtk.Notebook(scrollable=True)
-        self.nb.connect("switch-page", lambda nb, page, i: self.update_title(page))
+        self.nb.connect("switch-page", lambda nb, page, i: (self.update_title(page),
+                                                            self.update_zoom(page)))
+        zb = Gtk.Box(spacing=2, margin_end=6)
+        for icon, tip, f in [("zoom-out-symbolic", "Dézoomer (Ctrl+-)", lambda c: c.zoom_step(-1)),
+                             (None, None, None),
+                             ("zoom-in-symbolic", "Zoomer (Ctrl++)", lambda c: c.zoom_step(1)),
+                             ("zoom-original-symbolic", "Taille réelle 100 % (Ctrl+0)", lambda c: c.set_zoom(1)),
+                             ("zoom-fit-best-symbolic", "Ajuster à la fenêtre (Ctrl+9)", lambda c: c.zoom_fit())]:
+            if icon is None:
+                self.zoom_label = Gtk.Label(label="100 %", width_chars=6)
+                zb.pack_start(self.zoom_label, False, False, 0); continue
+            b = Gtk.Button.new_from_icon_name(icon, Gtk.IconSize.BUTTON)
+            b.set_relief(Gtk.ReliefStyle.NONE); b.set_tooltip_text(tip)
+            b.connect("clicked", lambda _b, f=f: self.current() and f(self.current()))
+            zb.pack_start(b, False, False, 0)
+        zb.show_all()
+        self.nb.set_action_widget(zb, Gtk.PackType.END)
         box.pack_start(self.nb, True, True, 0)
 
         self.connect("key-press-event", self.on_key)
@@ -840,6 +904,10 @@ class Editor(Gtk.Window):
     def current(self):
         i = self.nb.get_current_page()
         return self.nb.get_nth_page(i) if i >= 0 else None
+
+    def update_zoom(self, c):
+        if c is not None:
+            self.zoom_label.set_text(f"{round(c.zoom * 100)} %")
 
     def update_title(self, c):
         if c is not None:
@@ -982,6 +1050,15 @@ class Editor(Gtk.Window):
         acts = {Gdk.KEY_s: self.save, Gdk.KEY_c: self.copy, Gdk.KEY_z: self.undo,
                 Gdk.KEY_y: self.do_redo, Gdk.KEY_n: self.new_capture, Gdk.KEY_o: self.open_files,
                 Gdk.KEY_w: lambda: self.current() and self.close_tab(self.current())}
+        c0 = self.current()
+        if ctrl and c0 and e.keyval in (Gdk.KEY_minus, Gdk.KEY_KP_Subtract):
+            c0.zoom_step(-1); return True
+        if ctrl and c0 and e.keyval in (Gdk.KEY_plus, Gdk.KEY_equal, Gdk.KEY_KP_Add):
+            c0.zoom_step(1); return True
+        if ctrl and c0 and e.keyval in (Gdk.KEY_0, Gdk.KEY_KP_0, Gdk.KEY_agrave):
+            c0.set_zoom(1); return True
+        if ctrl and c0 and e.keyval in (Gdk.KEY_9, Gdk.KEY_KP_9, Gdk.KEY_ccedilla):
+            c0.zoom_fit(); return True
         if ctrl and k == Gdk.KEY_r:
             self.rotate(not e.state & Gdk.ModifierType.SHIFT_MASK); return True
         if ctrl and k in acts:
