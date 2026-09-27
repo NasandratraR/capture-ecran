@@ -1139,7 +1139,10 @@ class App(Gtk.Application):
             print(self.output)
             self.output = None
         else:
-            self.ensure_editor().add_capture(pix)
+            ed = self.ensure_editor()
+            ed.add_capture(pix)
+            ed.copy()   # la capture va directement dans le presse-papiers
+            ed.hb.set_subtitle(f"{pix.get_width()} × {pix.get_height()} · copiée dans le presse-papiers")
             self.editor.show()
             self.editor.present()
         self.release()
