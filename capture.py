@@ -844,7 +844,7 @@ class Editor(Gtk.Window):
         tb.pack_start(self.color, False, False, 0)
         tb.pack_start(Gtk.Label(label="Épaisseur"), False, False, 6)
         self.size = Gtk.SpinButton.new_with_range(1, 20, 1)
-        self.size.set_value(10); self.size.set_tooltip_text("Épaisseur / taille")
+        self.size.set_value(4); self.size.set_tooltip_text("Épaisseur / taille")
         tb.pack_start(self.size, False, False, 0)
         # modifier couleur / épaisseur agit aussi sur l'élément sélectionné
         self.syncing = False
