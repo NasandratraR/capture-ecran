@@ -40,7 +40,9 @@ Une seule instance : relancer l'application ajoute un onglet à la fenêtre déj
 | Ctrl+N | Nouvelle capture |
 | Ctrl+O | Ouvrir une image |
 | Ctrl+S | Enregistrer |
-| Ctrl+C | Copier |
+| Ctrl+C | Copier l'image (et l'élément sélectionné) |
+| Ctrl+V | Coller un clone de l'élément copié |
+| Ctrl+D | Dupliquer l'élément sélectionné |
 | Ctrl+Z / Ctrl+Y | Annuler / Rétablir |
 | Ctrl+R / Ctrl+Maj+R | Pivoter à droite / à gauche |
 | Ctrl+W | Fermer l'onglet |

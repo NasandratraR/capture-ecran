@@ -588,6 +588,16 @@ class Canvas(Gtk.ScrolledWindow):
             self.sel = None
             self.changed()
 
+    def paste_shape(self, src, offset):
+        """Ajoute un clone de l'annotation src, décalé de offset pixels."""
+        s = {k: v for k, v in src.items() if k not in ("bbox", "poly")}   # recalculés au dessin
+        s["pts"] = [(x + offset, y + offset) for x, y in src["pts"]]
+        if s["kind"] == "number":
+            s["n"] = 1 + sum(1 for t in self.shapes if t["kind"] == "number")
+        self.push(s)
+        self.clicked = True   # élément existant : la barre de style le modifie
+        self.ed.show_style(s)
+
     def text_at(self, x, y):
         for s in reversed(self.shapes):
             if s["kind"] == "text" and "bbox" in s:
@@ -1006,9 +1016,23 @@ class Editor(Gtk.Window):
 
     def copy(self):
         c = self.current()
+        if c and c.sel in c.shapes:
+            # élément sélectionné : on le garde pour Ctrl+V (clonage)
+            self.clip_shape, self.paste_n = dict(c.sel, pts=list(c.sel["pts"])), 0
         if c:
             cb = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
             cb.set_image(c.final_pixbuf()); cb.store()
+
+    def paste(self):
+        c, src = self.current(), getattr(self, "clip_shape", None)
+        if c and src:
+            self.paste_n += 1   # collages successifs : en cascade
+            c.paste_shape(src, 20 * self.paste_n)
+
+    def duplicate(self):
+        c = self.current()
+        if c and c.sel in c.shapes:
+            c.paste_shape(c.sel, 20)
 
     def save(self):
         c = self.current()
@@ -1047,7 +1071,8 @@ class Editor(Gtk.Window):
     def on_key(self, w, e):
         ctrl = e.state & Gdk.ModifierType.CONTROL_MASK
         k = Gdk.keyval_to_lower(e.keyval)
-        acts = {Gdk.KEY_s: self.save, Gdk.KEY_c: self.copy, Gdk.KEY_z: self.undo,
+        acts = {Gdk.KEY_s: self.save, Gdk.KEY_c: self.copy, Gdk.KEY_v: self.paste,
+                Gdk.KEY_d: self.duplicate, Gdk.KEY_z: self.undo,
                 Gdk.KEY_y: self.do_redo, Gdk.KEY_n: self.new_capture, Gdk.KEY_o: self.open_files,
                 Gdk.KEY_w: lambda: self.current() and self.close_tab(self.current())}
         c0 = self.current()
@@ -1061,6 +1086,8 @@ class Editor(Gtk.Window):
             c0.zoom_fit(); return True
         if ctrl and k == Gdk.KEY_r:
             self.rotate(not e.state & Gdk.ModifierType.SHIFT_MASK); return True
+        if ctrl and k in (Gdk.KEY_c, Gdk.KEY_v) and isinstance(self.get_focus(), Gtk.Entry):
+            return False   # copier-coller dans un champ de saisie
         if ctrl and k in acts:
             acts[k](); return True
         c = self.current()
